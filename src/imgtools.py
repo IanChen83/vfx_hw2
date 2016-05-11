@@ -224,7 +224,6 @@ class Merger:
             a = link.img1
             b = link.img2
 
-            print("?")
             b.total_mat = np.dot(link.mat, a.total_mat)
             b.bond = Merger.get_transform_boundary((0, 0, b.image.shape[0], b.image.shape[1]), b.total_mat)
             b.mask = np.ones(b.image.shape[0]) * 255

@@ -11,21 +11,16 @@ def fpoint_hash_func_norm(x, y, desc):
 
 
 def parse_mat(path):
-    try:
-        temp = si.loadmat(path)
-        mat = temp["b"][0][0].transpose(2, 0, 1)
-        points = temp["a"][0][0].astype(np.int32)
+    temp = si.loadmat(path)
+    mat = temp["b"][0][0].transpose(2, 0, 1)
+    points = temp["a"][0][0].astype(np.int32)
 
-        ret = []
+    ret = []
 
-        for i in range(len(points)):
-            ret.append(fpoint(int(points[i][0]), int(points[i][1]), mat[i], 1000))
-        print("Parse {0} points from {1}".format(len(ret), path))
-        return ret
-
-    except Exception as e:
-        print(e)
-        return None
+    for i in range(len(points)):
+        ret.append(fpoint(int(points[i][0]), int(points[i][1]), mat[i], 1000))
+    print("Parse {0} points from {1}".format(len(ret), path))
+    return ret
 
 
 def match(target, ref):

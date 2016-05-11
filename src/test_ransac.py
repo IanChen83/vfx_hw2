@@ -9,9 +9,9 @@ import sys
 focal = 300
 #showcase_mask(np.array(list(range(255))))
 #
-mat1 = parse_mat("../grail/1.mat")
-mat2 = parse_mat("../grail/2.mat")
-mat3 = parse_mat("../grail/3.mat")
+# mat1 = parse_mat("../grail/1.mat")
+# mat2 = parse_mat("../grail/2.mat")
+# mat3 = parse_mat("../grail/3.mat")
 # mat71 = parse_mat("../data/71.mat")
 # mat72 = parse_mat("../data/72.mat")
 
@@ -57,7 +57,7 @@ for i in range(start, end):
     matrices[i] = parse_mat("../grail/{num}.mat".format(num=i))
     merger.add_image(np.array(Image.open("../grail/{num}.jpg".format(num=i))).transpose((1, 0, 2)), str(i))
     if i > start:
-        merger.add_matrix(match(matrices[i-1], matrices[i]), str(i-1), str(i))
+        merger.add_matrix(match(matrices[i-1], matrices[i])[0], str(i-1), str(i))
 
 merger.merge("0").show()
 

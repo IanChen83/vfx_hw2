@@ -78,18 +78,22 @@ def cyl_mapping(img, focal, ps=None):
 
     _x, _y = cyl_function(focal)
 
-    pret = np.array(Image.new("RGB", img.size)).transpose((1, 0, 2))
+    ret = Image.new("RGBA", img.size)
+    pret = ret.load()
+    # pret = np.array(Image.new("RGBA", img.size)).transpose((1, 0, 2))
 
     for t in it.product(range(x_start, x + x_start), range(y_start, y + y_start)):
         pret[_x(*t) - x_start, _y(*t) - y_start] = pimg[t[0] - x_start, t[1] - y_start]
 
+    bbox = ret.getbbox()
+
     if ps is None:
-        return pret
+        return np.array(ret).transpose((1, 0, 2))[bbox[0]:bbox[2], bbox[1]:bbox[3], :]
 
     for fp in ps:
-        fp.x, fp.y = _x(fp.x + x_start, fp.y + y_start) - x_start, _y(fp.x + x_start, fp.y + y_start) - y_start
+        fp.x, fp.y = _x(fp.x + x_start, fp.y + y_start) - x_start -bbox[0], _y(fp.x + x_start, fp.y + y_start) - y_start - bbox[1]
 
-    return pret
+    return np.array(ret).transpose((1, 0, 2))[bbox[0]:bbox[2], bbox[1]:bbox[3],:]
 
 
 class Merger:
@@ -246,7 +250,7 @@ class Merger:
 
         shiftx = -left
         shifty = -top
-        self.output = np.zeros((int(right - left), int(bottom - top), 3))
+        self.output = np.zeros((int(right - left), int(bottom - top), 4))
         self.output_mask = np.ones(int(right - left))
 
         merge_list = list(sorted(self.images.values(), key=lambda x: x.bond[0]))

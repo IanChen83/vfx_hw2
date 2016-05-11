@@ -1,4 +1,4 @@
-from imgtools import get_transform, fppair, fpoint
+from imgtools import *
 from math import sqrt
 def case1():
     fpp1 = fppair((

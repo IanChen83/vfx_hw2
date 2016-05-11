@@ -12,8 +12,8 @@ def fpoint_hash_func_norm(x, y, desc):
 
 def parse_mat(path):
     temp = si.loadmat(path)
-    mat = temp["b"][0][0].transpose(2, 0, 1)
-    points = temp["a"][0][0].astype(np.int32)
+    mat = temp["b"[].transpose(2, 0, 1)
+    points = temp["coor"].astype(np.int32)
 
     ret = []
 
@@ -27,7 +27,7 @@ def match(target, ref):
     ret = LimitedPriorityQueue(30)
     for x in product(target, ref):
         ret.push(fppair(x))
-
+    # return ret.queue
     q3 = voting_filter(ret.queue)
 
     # Method 1: Average #

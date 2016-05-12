@@ -30,6 +30,8 @@ def match(target, ref):
     # return ret.queue
     q3 = voting_filter(ret.queue)
 
+    return ransac(q3, 100), q3
+
     # Method 1: Average #
     mat = np.identity(3)
 
@@ -75,16 +77,48 @@ def distance_cost(fpp, mat):
     return abs(m[0] - fp1.x) + abs(m[1] - fp1.y)
 
 
-def avg_distance(queue, mat, thr=50):
+def avg_distance(queue, mat, thr=0):
     count = 0
     cost = 0
     q = []
-    for pp in queue:
-        count += 1
-        cost += distance_cost(pp, mat)
+    if thr == 0:
+        for pp in queue:
+            count += 1
+            cost += distance_cost(pp, mat)
 
-    return cost/count
+        return cost/count
+    else:
+        inl, outl = 0, 0
+        for pp in queue:
+            c = distance_cost(pp, mat)
+            count += 1
+            if c >= thr:
+                outl += 1
+            else:
+                inl += 1
+                cost += c
+        if inl != 0:
+            return inl, cost/inl
+        return inl, 1000000
 
+def ransac(fpps, thr, k=5000):
+    gn = 5
+    min_distance, min_mat = 1000000, None
+    for _ in range(k):
+        g = random.sample(fpps, gn)
+        v = sum([pp.fp1 - pp.fp2 for pp in g])/gn
+        mat = np.identity(3)
+        mat[0,2] = v.x
+        mat[1,2] = v.y
+        inl, avg = avg_distance(fpps, mat, thr)
+        if avg < min_distance:
+            min_distance, min_mat = avg, mat
+
+    [print(x) for x in g]
+    print(min_mat[0,2], min_mat[1,2])
+    print(min_distance)
+
+    return mat
 
 def voting_filter(q):
     key1x = lambda x: x.fp1.x

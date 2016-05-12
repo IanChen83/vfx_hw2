@@ -56,30 +56,70 @@ class vector:
             return vector(self.x + other, self.y + other)
         return vector(self.x + other.x, self.y + other.y)
 
+    def __radd__(self, other):
+        if type(other) == int or type(other) == float:
+            return vector(self.x + other, self.y + other)
+        return NotImplemented
+
     def __sub__(self, other):
         if type(other) == int or type(other) == float:
             return vector(self.x - other, self.y - other)
         return vector(self.x - other.x, self.y - other.y)
+
+    def __rsub__(self, other):
+        if type(other) == int or type(other) == float:
+            return vector(self.x - other, self.y - other)
+        return NotImplemented
 
     def __mul__(self, other):
         if type(other) == int or type(other) == float:
             return vector(self.x * other, self.y * other)
         return self.x * other.x + self.y * other.y
 
-    def __div__(self, other):
+    def __rmul__(self, other):
+        if type(other) == int or type(other) == float:
+            return vector(self.x * other, self.y * other)
+        return NotImplemented
+
+    def __truediv__(self, other):
         if type(other) == int or type(other) == float:
             return vector(self.x / other, self.y/other)
         return NotImplemented
 
+    def __rtruediv__(self, other):
+        return NotImplemented
+
     def __iadd__(self, other):
+        if type(other) == int or type(other) == float:
+            self.x += other
+            self.y += other
+            return self
         self.x += other.x
         self.y += other.y
         return self
 
     def __isub__(self, other):
+        if type(other) == int or type(other) == float:
+            self.x -= other
+            self.y -= other
+            return self
         self.x -= other.x
         self.y -= other.y
         return self
+
+    def __imul__(self, other):
+        if type(other) == int or type(other) == float:
+            self.x *= other
+            self.y *= other
+            return self
+        return NotImplemented
+
+    def __itruediv__(self, other):
+        if type(other) == int or type(other) == float:
+            self.x /= other
+            self.y /= other
+            return self
+        return NotImplemented
 
     def __neg__(self):
         return vector(-self.x, -self.y)

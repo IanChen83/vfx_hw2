@@ -12,7 +12,7 @@ def fpoint_hash_func_norm(x, y, desc):
 
 def parse_mat(path):
     temp = si.loadmat(path)
-    mat = temp["b"[].transpose(2, 0, 1)
+    mat = temp["descriptor"].transpose(2, 0, 1)
     points = temp["coor"].astype(np.int32)
 
     ret = []
@@ -24,28 +24,41 @@ def parse_mat(path):
 
 
 def match(target, ref):
+    ########### Method 1 #############
+    #q3 = []
+    #for x in target:
+    #    ret = LimitedPriorityQueue(1)
+    #    for y in ref:
+    #        ret.push(fppair((x,y)))
+    #    q3 = q3 + ret.queue
+
+    #return ransac(q3, 100), q3
+
+    ########### Method 2 #############
     ret = LimitedPriorityQueue(30)
     for x in product(target, ref):
         ret.push(fppair(x))
     # return ret.queue
     q3 = voting_filter(ret.queue)
-
+    if len(q3) == 0:
+        print("Voting filter failed")
+        return ransac(ret.queue, 100), q3
     return ransac(q3, 100), q3
 
     # Method 1: Average #
-    mat = np.identity(3)
+    #mat = np.identity(3)
 
     # Translation
-    sx, sy = 0, 0
-    for pp in q3:
-        sx += (pp.fp1.x - pp.fp2.x)
-        sy += (pp.fp1.y - pp.fp2.y)
+    #sx, sy = 0, 0
+    #for pp in q3:
+    #    sx += (pp.fp1.x - pp.fp2.x)
+    #    sy += (pp.fp1.y - pp.fp2.y)
 
-    sx /= len(q3)
-    sy /= len(q3)
+    #sx /= len(q3)
+    #sy /= len(q3)
 
-    mat[0, 2] = sx
-    mat[1, 2] = sy
+    #mat[0, 2] = sx
+    #mat[1, 2] = sy
 
     # Rotation (not working :(( )
     # r = 0
@@ -65,9 +78,9 @@ def match(target, ref):
     # mat[1,0] = -s
     # mat[1,1] = c
 
-    print("Matching with inlier cost = {0}".format(avg_distance(q3, mat)))
+    #print("Matching with inlier cost = {0}".format(avg_distance(q3, mat)))
 
-    return mat, q3
+    #return mat, q3
 
 
 def distance_cost(fpp, mat):
@@ -99,26 +112,28 @@ def avg_distance(queue, mat, thr=0):
                 cost += c
         if inl != 0:
             return inl, cost/inl
-        return inl, 1000000
+        else:
+            return inl, 1000000
 
-def ransac(fpps, thr, k=5000):
-    gn = 5
+
+def ransac(fpps, thr, k=10000):
+    gn = 3
     min_distance, min_mat = 1000000, None
     for _ in range(k):
         g = random.sample(fpps, gn)
         v = sum([pp.fp1 - pp.fp2 for pp in g])/gn
         mat = np.identity(3)
-        mat[0,2] = v.x
-        mat[1,2] = v.y
+        mat[0, 2] = v.x
+        mat[1, 2] = v.y
         inl, avg = avg_distance(fpps, mat, thr)
         if avg < min_distance:
             min_distance, min_mat = avg, mat
 
-    [print(x) for x in g]
-    print(min_mat[0,2], min_mat[1,2])
     print(min_distance)
+    if min_mat is None:
+        return ransac(fpps, thr + 150, k)
+    return min_mat
 
-    return mat
 
 def voting_filter(q):
     key1x = lambda x: x.fp1.x
@@ -131,11 +146,11 @@ def voting_filter(q):
     for x, gx in groupby(sorted(q, key=key1x), key=key1x):
         for y, gy in groupby(sorted(gx, key=key1y), key=key1y):
             g = list(gy)
-            if len(g) == 1:
+            if len(g) == 1 or len(g) == 2:
                 q2 = q2 + g
     for x, gx in groupby(sorted(q2, key=key2x), key=key2x):
         for y, gy in groupby(sorted(gx, key=key2y), key=key2y):
             g = list(gy)
-            if len(g) == 1:
+            if len(g) == 1 or len(g) == 2:
                 q3 = q3 + g
     return q3

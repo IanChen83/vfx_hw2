@@ -4,6 +4,8 @@ import numpy as np
 import itertools as it
 from ImageClass import MatrixWrapper, ImageWrapper
 
+MERGE_AXIS = 'x'
+CYL_MAPPING = False
 
 def mark_point(img, xy, size=6):
     draw = ImageDraw.Draw(img)
@@ -20,7 +22,9 @@ def showcase_mask(mask, h=300):
     Image.fromarray(np.uint8(np.repeat(mask, h).reshape((mask.shape[0], h)).transpose(1, 0)), mode='L').show()
 
 
-def showcase_pairing(img1, img2, pp):
+def showcase_pairing(pimg1, pimg2, pp):
+    img1 = Image.fromarray(np.uint8(np.array(pimg1.image).transpose(1, 0, 2)))
+    img2 = Image.fromarray(np.uint8(np.array(pimg2.image).transpose(1, 0, 2)))
     size1, size2 = img1.size, img2.size
     ratio = 0.0
     w_over_h = ((size1[0] + size2[0])/(size1[1] + size2[1]) > (16/9))
@@ -71,6 +75,8 @@ def transform(p, mat):
 
 
 def cyl_mapping(img, focal, ps=None):
+    if not CYL_MAPPING:
+        return np.array(img).transpose((1,0,2))
     x, y = img.size
     x_start = -int(floor(x/2))
     y_start = -int(floor(y/2))
@@ -106,7 +112,7 @@ class Merger:
     def get_overlap_x(bond1, bond2):
         print("bond1:{0}".format(bond1))
         print("bond2:{0}".format(bond2))
-        # return overlap_y, if bond2 is in the right side of bond1
+        # return overlap_x, if bond2 is in the right side of bond1
 
         def seg3(seg, p):
             if p < seg[0]:
@@ -118,11 +124,35 @@ class Merger:
 
         a = seg3((bond1[0], bond1[2]), bond2[0])
         if a == 0:
-            if bond2[2] > bond1[0]:
+            if bond2[0] > bond1[0]:
                 return [bond1[0], bond2[2]], False
             return None, False
         elif a == 1:
             return [bond2[0], bond1[2]], True
+        else:
+            return None, True
+
+    @staticmethod
+    def get_overlap_y(bond1, bond2):
+        print("bond1:{0}".format(bond1))
+        print("bond2:{0}".format(bond2))
+        # return overlap_y, if bond2 is in the right side of bond1
+
+        def seg3(seg, p):
+            if p < seg[0]:
+                return 0
+            elif p > seg[1]:
+                return 2
+            else:
+                return 1
+
+        a = seg3((bond1[1], bond1[3]), bond2[1])
+        if a == 0:
+            if bond2[3] > bond1[1]:
+                return [bond1[1], bond2[3]], False
+            return None, False
+        elif a == 1:
+            return [bond2[1], bond1[3]], True
         else:
             return None, True
 
@@ -189,21 +219,44 @@ class Merger:
             im.visited = False
 
     @staticmethod
-    def draw_value(mat, x, v):
-        mat[x] = min(v, mat[x])
+    def draw_value(mat, s, v):
+        mat[s] = min(v, mat[s])
 
     @staticmethod
-    def draw_gradient(mask, x1, x2, v1, v2):
-        s = (v2 - v1) / (x2 - x1)
+    def draw_gradient(mask, s1, s2, v1, v2):
+        s = (v2 - v1) / (s2 - s1)
         v = v1
-        for y in range(x1, x2):
-            Merger.draw_value(mask, y, v)
+        for t in range(s1, s2):
+            Merger.draw_value(mask, t, v)
             v += s
 
     @staticmethod
-    def blend_mask(img1, img2):
-        seg, bottom = Merger.get_overlap_x(img1.bond, img2.bond)
+    def blend_mask_y(img1, img2):
+        seg, bottom = Merger.get_overlap_y(img1.bond, img2.bond)
         assert bottom is True
+        if seg is None:
+            return
+
+        shift1, shift2 = img1.bond[1], img2.bond[1]
+
+        print(seg)
+        # For img1
+        for y in range(int(seg[0] - shift1)):
+            Merger.draw_value(img1.mask, y, 255)
+        Merger.draw_gradient(img1.mask, int(seg[0] - shift1), int(seg[1] - shift1), 255, 1)
+        for y in range(int(seg[1] - shift1), img1.image.shape[1]):
+            Merger.draw_value(img1.mask, y, 1)
+        # For img2
+        for y in range(int(seg[0] - shift2)):
+                Merger.draw_value(img2.mask, y, 1)
+        Merger.draw_gradient(img2.mask, int(seg[0] - shift2), int(seg[1] - shift2), 1, 255)
+        for y in range(int(seg[1] - shift2), img2.image.shape[1]):
+            Merger.draw_value(img2.mask, y, 255)
+
+    @staticmethod
+    def blend_mask_x(img1, img2):
+        seg, right = Merger.get_overlap_x(img1.bond, img2.bond)
+        assert right is True
         if seg is None:
             return
 
@@ -230,14 +283,24 @@ class Merger:
 
             b.total_mat = np.dot(link.mat, a.total_mat)
             b.bond = Merger.get_transform_boundary((0, 0, b.image.shape[0], b.image.shape[1]), b.total_mat)
-            b.mask = np.ones(b.image.shape[0]) * 255
+            if MERGE_AXIS == 'y':
+                b.mask = np.ones(b.image.shape[1]) * 255
+            elif MERGE_AXIS == 'x':
+                b.mask = np.ones(b.image.shape[0]) * 255
+            else:
+                raise ValueError
 
         # DFS to find boundary and total matrix
         # root node
         iimg = self.images[root]
         iimg.total_mat = np.identity(3)
         iimg.bond = 0, 0, iimg.image.shape[0], iimg.image.shape[1]
-        iimg.mask = np.ones(iimg.image.shape[0]) * 255
+        if MERGE_AXIS == 'y':
+            iimg.mask = np.ones(iimg.image.shape[1]) * 255
+        elif MERGE_AXIS == 'x':
+            iimg.mask = np.ones(iimg.image.shape[0]) * 255
+        else:
+            raise ValueError
 
         self.dfs(root, prepare_merge, None)
 
@@ -251,31 +314,55 @@ class Merger:
         shiftx = -left
         shifty = -top
         self.output = np.zeros((int(right - left), int(bottom - top), 4))
-        self.output_mask = np.ones(int(right - left))
+        merge_list = None
+        if MERGE_AXIS == 'y':
+            self.output_mask = np.ones(int(bottom - top))
+            merge_list = list(sorted(self.images.values(), key=lambda x: x.bond[1]))
+        elif MERGE_AXIS == 'x':
+            self.output_mask = np.ones(int(right - left))
+            merge_list = list(sorted(self.images.values(), key=lambda x: x.bond[0]))
+        else:
+            raise ValueError
 
-        merge_list = list(sorted(self.images.values(), key=lambda x: x.bond[0]))
         for i in range(len(merge_list)):
             im = merge_list[i]
             print("===== {0} =====".format(im.name))
             print("Boundary: {0}".format(im.bond))
 
             if i != len(merge_list) - 1:
-                Merger.blend_mask(merge_list[i], merge_list[i+1])
+                if MERGE_AXIS == 'y':
+                    Merger.blend_mask_y(merge_list[i], merge_list[i + 1])
+                elif MERGE_AXIS == 'x':
+                    Merger.blend_mask_x(merge_list[i], merge_list[i + 1])
+                else:
+                    raise ValueError
 
             self.paste(im.image, im.total_mat, (shiftx, shifty), im.mask)
 
         print(self.output_mask)
-
-        self.output /= self.output_mask[:, np.newaxis, np.newaxis]
+        if MERGE_AXIS == 'y':
+            self.output /= self.output_mask[np.newaxis, :, np.newaxis]
+        elif MERGE_AXIS == 'x':
+            self.output /= self.output_mask[:, np.newaxis, np.newaxis]
+        else:
+            raise ValueError
 
         return Image.fromarray(np.uint8(self.output.transpose(1, 0, 2)))
 
     def paste(self, b, mat, shift=(0, 0), mask=None):
         if mask is not None:
-            assert b.shape[0] == mask.shape[0]
             shift = int(mat[0, 2] + shift[0]), int(mat[1, 2] + shift[1])
-            self.output_mask[shift[0]: shift[0] + mask.shape[0]] += mask
-            Merger.paste_matrix(self.output, b * mask[:, np.newaxis, np.newaxis], shift)
+            if MERGE_AXIS == 'y':
+                assert b.shape[1] == mask.shape[0]
+                self.output_mask[shift[1]: shift[1] + mask.shape[0]] += mask
+                Merger.paste_matrix(self.output, b * mask[np.newaxis, :, np.newaxis], shift)
+            elif MERGE_AXIS == 'x':
+                assert b.shape[0] == mask.shape[0]
+                self.output_mask[shift[0]: shift[0] + mask.shape[0]] += mask
+                Merger.paste_matrix(self.output, b * mask[:, np.newaxis, np.newaxis], shift)
+            else:
+                raise ValueError
+
         else:
             shift = int(mat[0, 2] + shift[0]), int(mat[1, 2] + shift[1])
             Merger.paste_matrix(self.output, b, shift)

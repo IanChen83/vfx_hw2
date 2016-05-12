@@ -5,7 +5,7 @@ import itertools as it
 from ImageClass import MatrixWrapper, ImageWrapper
 
 MERGE_AXIS = 'x'
-CYL_MAPPING = False
+CYL_MAPPING = True
 
 def mark_point(img, xy, size=6):
     draw = ImageDraw.Draw(img)

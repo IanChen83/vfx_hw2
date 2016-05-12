@@ -5,6 +5,9 @@ from itertools import groupby, product, permutations, combinations
 from LimitedPriorityQueue import *
 from imgtools import *
 
+VOTING_FILTER_ENABLE = False
+RANSAC_SAMPLE_NUM = 3
+RANSAC_THRESHOLD = 5
 
 def fpoint_hash_func_norm(x, y, desc):
     return int(floor(nl.norm(desc)/100))
@@ -40,10 +43,10 @@ def match(target, ref):
         ret.push(fppair(x))
     # return ret.queue
     q3 = voting_filter(ret.queue)
-    if len(q3) == 0:
+    if len(q3) < RANSAC_SAMPLE_NUM:
         print("Voting filter failed")
-        return ransac(ret.queue, 100), q3
-    return ransac(q3, 100), q3
+        return ransac(ret.queue, RANSAC_THRESHOLD), q3
+    return ransac(ret.queue, RANSAC_THRESHOLD), ret.queue
 
     # Method 1: Average #
     #mat = np.identity(3)
@@ -99,7 +102,7 @@ def avg_distance(queue, mat, thr=0):
             count += 1
             cost += distance_cost(pp, mat)
 
-        return cost/count
+        return 0, cost/count
     else:
         inl, outl = 0, 0
         for pp in queue:
@@ -116,9 +119,9 @@ def avg_distance(queue, mat, thr=0):
             return inl, 1000000
 
 
-def ransac(fpps, thr, k=10000):
-    gn = 3
-    min_distance, min_mat = 1000000, None
+def ransac(fpps, thr, k=5000):
+    gn = RANSAC_SAMPLE_NUM
+    max_inl, min_distance, min_mat =0, 1000000, None
     for _ in range(k):
         g = random.sample(fpps, gn)
         v = sum([pp.fp1 - pp.fp2 for pp in g])/gn
@@ -126,16 +129,21 @@ def ransac(fpps, thr, k=10000):
         mat[0, 2] = v.x
         mat[1, 2] = v.y
         inl, avg = avg_distance(fpps, mat, thr)
-        if avg < min_distance:
-            min_distance, min_mat = avg, mat
-
-    print(min_distance)
+        if inl > max_inl:
+            max_inl = inl
+            min_mat = mat
+#        if avg < min_distance:
+#            min_distance, min_mat = avg, mat
+    print("max inl: {0}".format(max_inl))
+#    print(min_distance)
     if min_mat is None:
         return ransac(fpps, thr + 150, k)
     return min_mat
 
 
 def voting_filter(q):
+    if VOTING_FILTER_ENABLE == False:
+        return q
     key1x = lambda x: x.fp1.x
     key1y = lambda x: x.fp1.y
     key2x = lambda x: x.fp2.x
@@ -146,11 +154,11 @@ def voting_filter(q):
     for x, gx in groupby(sorted(q, key=key1x), key=key1x):
         for y, gy in groupby(sorted(gx, key=key1y), key=key1y):
             g = list(gy)
-            if len(g) == 1 or len(g) == 2:
+            if len(g) == 1:
                 q2 = q2 + g
     for x, gx in groupby(sorted(q2, key=key2x), key=key2x):
         for y, gy in groupby(sorted(gx, key=key2y), key=key2y):
             g = list(gy)
-            if len(g) == 1 or len(g) == 2:
+            if len(g) == 1:
                 q3 = q3 + g
     return q3
